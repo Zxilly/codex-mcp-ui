@@ -14,8 +14,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: Build & test
+  go-test:
+    name: Go test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Test Go
+        run: go test ./cmd/... ./internal/... ./integration/...
+
+  web-test:
+    name: Web test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -26,14 +40,9 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "1.26"
-          cache: true
 
       - name: Install web dependencies
         working-directory: web
@@ -55,12 +64,34 @@ jobs:
         working-directory: web
         run: pnpm run test:browser
 
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
       - name: Build web
         working-directory: web
         run: pnpm run build
-
-      - name: Test Go
-        run: go test ./cmd/... ./internal/... ./integration/...
 
       - name: Build Go
         run: go build -o bin/codex-mcp-ui ./cmd/codex-mcp-ui
