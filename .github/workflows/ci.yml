@@ -25,6 +25,11 @@ jobs:
           go-version: "1.26"
           cache: true
 
+      - name: Stub embedded web assets
+        run: |
+          mkdir -p internal/hub/web/dist
+          printf '<!doctype html><title>stub</title>' > internal/hub/web/dist/index.html
+
       - name: Test Go
         run: go test ./cmd/... ./internal/... ./integration/...
 
