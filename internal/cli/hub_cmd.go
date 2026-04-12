@@ -73,7 +73,7 @@ func newHubServeCmd() *cobra.Command {
 			return srv.Shutdown(ctx)
 		},
 	}
-	c.Flags().StringVar(&dataDir, "data-dir", "", "hub data directory (defaults to per-user location)")
+	c.Flags().StringVar(&dataDir, "data-dir", "", "hub data directory (default: user home/"+hub.DefaultDataDirName+")")
 	c.Flags().DurationVar(&idleTimeout, "idle-timeout", 30*time.Minute, "shut down the hub after this duration with no API activity (zero disables)")
 	return c
 }

@@ -8,7 +8,8 @@ type Config struct {
 	// automatic port (used in tests).
 	UIPort int
 	// DataDir is the directory used for the SQLite database and any
-	// other per-hub persistent state.
+	// other per-hub persistent state. Empty means
+	// filepath.Join(os.UserHomeDir(), ".codex-mcp-ui").
 	DataDir string
 	// IdleTimeout shuts the hub down after this duration with no
 	// observed API activity. Zero disables idle shutdown.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -34,6 +35,12 @@ func NewApp(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	dataDir, err := ResolveDataDir(cfg.DataDir)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DataDir = dataDir
+
 	app := &App{
 		Config:     cfg,
 		InstanceID: id,
@@ -42,14 +49,15 @@ func NewApp(cfg Config) (*App, error) {
 		ShutdownCh: make(chan struct{}),
 		touchCh:    make(chan struct{}, 1),
 	}
-	if cfg.DataDir != "" {
-		dbPath := filepath.Join(cfg.DataDir, "codex-mcp-ui.db")
-		store, err := sqlite.Open(dbPath)
-		if err != nil {
-			return nil, err
-		}
-		app.Store = store
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create data directory: %w", err)
 	}
+	dbPath := filepath.Join(dataDir, "codex-mcp-ui.db")
+	store, err := sqlite.Open(dbPath)
+	if err != nil {
+		return nil, err
+	}
+	app.Store = store
 	return app, nil
 }
 
