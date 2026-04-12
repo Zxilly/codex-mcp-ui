@@ -97,10 +97,18 @@ func TestServerStatusReportsUnreachableHub(t *testing.T) {
 	require.True(t, strings.Contains(err.Error(), "not reachable") || strings.Contains(err.Error(), "incompatible"))
 }
 
-func TestHubBaseURLRequiresPort(t *testing.T) {
+func TestHubBaseURLUsesDefaultPort(t *testing.T) {
 	cmd := NewRootCmd()
-	// No --ui-port set.
-	_, err := hubBaseURL(cmd.Commands()[0]) // any subcommand shares the persistent flag
+	// With no explicit --ui-port, the default 8787 is used.
+	base, err := hubBaseURL(cmd.Commands()[0])
+	require.NoError(t, err)
+	require.Equal(t, "http://127.0.0.1:8787", base)
+}
+
+func TestHubBaseURLRejectsZeroPort(t *testing.T) {
+	cmd := NewRootCmd()
+	require.NoError(t, cmd.PersistentFlags().Set("ui-port", "0"))
+	_, err := hubBaseURL(cmd.Commands()[0])
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "--ui-port is required")
 }

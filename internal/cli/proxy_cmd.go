@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,22 +20,13 @@ import (
 	"github.com/codex/codex-mcp-ui/internal/proxy"
 )
 
-// errMissingDownstreamArgs is returned when proxy mode is invoked without
-// `--` followed by the downstream codex command.
-var errMissingDownstreamArgs = errors.New("expected downstream arguments after --")
-
 func runProxyCmd(cmd *cobra.Command, args []string) error {
-	dashIdx := cmd.ArgsLenAtDash()
-	if dashIdx < 0 || len(args) == 0 {
-		return errMissingDownstreamArgs
-	}
-	downstream := args[dashIdx:]
-	if len(downstream) == 0 {
-		return errMissingDownstreamArgs
-	}
 	uiPort, _ := cmd.Root().PersistentFlags().GetInt("ui-port")
+	// FParseErrWhitelist{UnknownFlags:true} silently drops unknown flags from
+	// cobra's parsed args, so we read os.Args directly and strip only --ui-port.
+	downstream := filterPassthroughArgs(os.Args[1:])
 	if uiPort <= 0 {
-		return fmt.Errorf("--ui-port is required")
+		return fmt.Errorf("--ui-port must be a positive integer")
 	}
 
 	ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
@@ -137,4 +128,23 @@ func randHex(n int) string {
 	buf := make([]byte, n)
 	_, _ = rand.Read(buf)
 	return hex.EncodeToString(buf)
+}
+
+// filterPassthroughArgs strips --ui-port (and its value) from argv so that
+// the remainder can be forwarded verbatim to `codex mcp-server`.
+// Both "--ui-port 8787" and "--ui-port=8787" forms are handled.
+func filterPassthroughArgs(argv []string) []string {
+	out := make([]string, 0, len(argv))
+	for i := 0; i < len(argv); i++ {
+		arg := argv[i]
+		if arg == "--ui-port" {
+			i++ // skip the following value
+			continue
+		}
+		if strings.HasPrefix(arg, "--ui-port=") {
+			continue
+		}
+		out = append(out, arg)
+	}
+	return out
 }
