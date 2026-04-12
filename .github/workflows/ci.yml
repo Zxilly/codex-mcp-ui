@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Lint web
+        working-directory: web
+        run: pnpm run lint
+
+      - name: Test web (unit)
+        working-directory: web
+        run: pnpm run test
+
+      - name: Test web (browser e2e)
+        working-directory: web
+        run: pnpm run test:browser
+
+      - name: Build web
+        working-directory: web
+        run: pnpm run build
+
+      - name: Test Go
+        run: go test ./cmd/... ./internal/... ./integration/...
+
+      - name: Build Go
+        run: go build -o bin/codex-mcp-ui ./cmd/codex-mcp-ui
