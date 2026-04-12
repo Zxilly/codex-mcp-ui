@@ -25,6 +25,67 @@ describe("milestoneTimeline", () => {
     expect(screen.getByText(/Turn complete/)).toBeInTheDocument()
   })
 
+  it("annotates tools/call with the tool name", () => {
+    const toolCall: EventRecord = {
+      event_id: "evt-tool",
+      timestamp: "2026-04-12T12:03:00Z",
+      proxy_instance_id: "proxy-1",
+      source_key: "s1",
+      thread_id: "t1",
+      direction: "upstream_to_codex",
+      category: "jsonrpc_request",
+      event_type: "tools/call",
+      payload: { params: { name: "search_web", arguments: { q: "x" } } },
+    }
+    render(<MilestoneTimeline events={[toolCall]} />)
+    expect(screen.getByText(/tools\/call: search_web/)).toBeInTheDocument()
+  })
+
+  it("falls back to a generic milestone for unknown event types", () => {
+    const unknown: EventRecord = {
+      event_id: "evt-unknown",
+      timestamp: "2026-04-12T12:03:30Z",
+      proxy_instance_id: "proxy-1",
+      source_key: "s1",
+      thread_id: "t1",
+      direction: "codex_to_upstream",
+      category: "codex_event",
+      event_type: "custom_extension_event",
+      payload: { hello: "world" },
+    }
+    render(<MilestoneTimeline events={[unknown]} />)
+    expect(screen.getByText("custom_extension_event")).toBeInTheDocument()
+  })
+
+  it("skips raw_frame and response noise", () => {
+    const noise: EventRecord[] = [
+      {
+        event_id: "evt-raw",
+        timestamp: "2026-04-12T12:03:45Z",
+        proxy_instance_id: "proxy-1",
+        source_key: "s1",
+        thread_id: "t1",
+        direction: "codex_to_upstream",
+        category: "raw_frame",
+        event_type: "raw_frame",
+        payload: "garbage",
+      },
+      {
+        event_id: "evt-resp",
+        timestamp: "2026-04-12T12:03:46Z",
+        proxy_instance_id: "proxy-1",
+        source_key: "s1",
+        thread_id: "t1",
+        direction: "codex_to_upstream",
+        category: "response",
+        event_type: "response",
+        payload: { result: {} },
+      },
+    ]
+    render(<MilestoneTimeline events={noise} />)
+    expect(screen.getByText(/Nothing recorded yet/i)).toBeInTheDocument()
+  })
+
   it("surfaces approval requests under an Approval: prefix", () => {
     const approval: EventRecord = {
       event_id: "evt-approval",

@@ -73,7 +73,7 @@ go tool cover -html=coverage.out
 ## Known v1 limits
 
 - Single local hub per port; no cross-host operation.
-- Observed event schema is a minimal curated subset; arbitrary MCP methods pass through unannotated.
+- Milestone annotations cover curated Codex events plus standard MCP methods (`initialize`, `tools/*`, `resources/*`, `prompts/*`, `sampling/*`, `notifications/*`); unrecognized methods render as generic milestones with raw payload.
 - Dashboard is read-only — no replay, edit, or cancel actions.
 - Goose migrations are embedded; no downgrade path exposed.
 - SSE resume via `Last-Event-ID` / `?since=` works within the broker's in-memory ring buffer (512 events); history beyond that must be paged via `GET /api/v1/sessions/{threadId}/events`.

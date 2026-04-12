@@ -7,12 +7,118 @@ interface MilestoneTimelineProps {
   events: EventRecord[]
 }
 
+type MilestoneKind
+  = | "session"
+    | "plan"
+    | "exec"
+    | "approval"
+    | "turn"
+    | "tool"
+    | "resource"
+    | "prompt"
+    | "sampling"
+    | "notification"
+    | "error"
+    | "other"
+
 interface Milestone {
   key: string
   timestamp: string
   title: string
   detail: string
-  kind: "session" | "plan" | "exec" | "approval" | "turn" | "other"
+  kind: MilestoneKind
+}
+
+function shortJSON(value: unknown, max = 280): string {
+  let s: string
+  try {
+    s = typeof value === "string" ? value : JSON.stringify(value)
+  }
+  catch {
+    s = String(value)
+  }
+  if (!s)
+    return ""
+  return s.length > max ? `${s.slice(0, max)}…` : s
+}
+
+function readStringField(
+  payload: unknown,
+  ...fields: string[]
+): string | undefined {
+  if (!payload || typeof payload !== "object")
+    return undefined
+  const params = (payload as { params?: unknown }).params
+  if (!params || typeof params !== "object")
+    return undefined
+  const obj = params as Record<string, unknown>
+  for (const f of fields) {
+    const v = obj[f]
+    if (typeof v === "string" && v.length > 0)
+      return v
+  }
+  return undefined
+}
+
+// buildMcpMilestone annotates known MCP spec methods so that, even when we
+// don't have a hand-tuned codex_event case for them, the timeline shows a
+// meaningful title instead of a raw method string.
+function buildMcpMilestone(evt: EventRecord): Milestone | null {
+  const method = evt.event_type
+  if (!method)
+    return null
+  const base = {
+    key: evt.event_id,
+    timestamp: evt.timestamp,
+    detail: shortJSON(evt.payload),
+  }
+  if (method === "initialize")
+    return { ...base, title: "MCP initialize", kind: "session" }
+  if (method === "ping")
+    return { ...base, title: "ping", kind: "other" }
+  if (method === "logging/setLevel")
+    return { ...base, title: method, kind: "notification" }
+  if (method.startsWith("notifications/"))
+    return { ...base, title: method, kind: "notification" }
+  if (method.startsWith("sampling/"))
+    return { ...base, title: method, kind: "sampling" }
+  if (method.startsWith("tools/")) {
+    const name = readStringField(evt.payload, "name")
+    const suffix = method === "tools/call" && name ? `: ${name}` : ""
+    return { ...base, title: `${method}${suffix}`, kind: "tool" }
+  }
+  if (method.startsWith("resources/")) {
+    const target = readStringField(evt.payload, "uri", "name")
+    const suffix = target ? `: ${target}` : ""
+    return { ...base, title: `${method}${suffix}`, kind: "resource" }
+  }
+  if (method.startsWith("prompts/")) {
+    const name = readStringField(evt.payload, "name")
+    const suffix = method === "prompts/get" && name ? `: ${name}` : ""
+    return { ...base, title: `${method}${suffix}`, kind: "prompt" }
+  }
+  if (method === "roots/list")
+    return { ...base, title: method, kind: "resource" }
+  if (method === "completion/complete")
+    return { ...base, title: method, kind: "sampling" }
+  return null
+}
+
+// fallbackMilestone catches anything the curated + MCP branches missed so
+// operators still see arbitrary traffic on the timeline. Responses and
+// unparseable raw frames are skipped to keep it readable — those live on
+// the Raw events tab.
+function fallbackMilestone(evt: EventRecord): Milestone | null {
+  if (evt.category === "response" || evt.category === "raw_frame")
+    return null
+  const title = evt.event_type ?? evt.category ?? "event"
+  return {
+    key: evt.event_id,
+    timestamp: evt.timestamp,
+    title,
+    detail: shortJSON(evt.payload),
+    kind: evt.category === "error" ? "error" : "other",
+  }
 }
 
 function buildMilestones(events: EventRecord[]): Milestone[] {
@@ -84,8 +190,17 @@ function buildMilestones(events: EventRecord[]): Milestone[] {
           kind: "turn",
         })
         break
-      default:
+      default: {
+        const mcp = buildMcpMilestone(evt)
+        if (mcp) {
+          out.push(mcp)
+          break
+        }
+        const fb = fallbackMilestone(evt)
+        if (fb)
+          out.push(fb)
         break
+      }
     }
   }
 
