@@ -1,8 +1,10 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	nethttp "net/http"
+	"strings"
 	"time"
 
 	"github.com/codex/codex-mcp-ui/internal/hub"
@@ -73,6 +75,7 @@ func eventsHandler(app *hub.App) nethttp.HandlerFunc {
 			return
 		}
 		rec.EventID = id
+		derivePersistentRows(r.Context(), app, body, occurredAt)
 		if app.Broker != nil {
 			app.Broker.Publish(hub.BrokerEvent{
 				EventID:         rec.EventID,
@@ -92,6 +95,122 @@ func eventsHandler(app *hub.App) nethttp.HandlerFunc {
 		}
 		writeJSON(w, nethttp.StatusOK, map[string]string{"status": "ok", "event_id": rec.EventID})
 	}
+}
+
+// Wire values shared with internal/proxy's envelope; duplicated locally to
+// avoid the proxy→hub/http import cycle. See internal/proxy/envelope.go.
+const (
+	directionUpstreamToCodex = "upstream_to_codex"
+	directionCodexToUpstream = "codex_to_upstream"
+	categoryResponse         = "response"
+	categoryError            = "error"
+)
+
+// parsedPayload is the union of every field the ingest extractors need.
+// Unmarshaling once and handing the struct to each extractor avoids parsing
+// the same payload three times on the hot path. Field names mirror
+// codex-rs/protocol/src/protocol.rs (SessionConfiguredEvent,
+// ThreadNameUpdatedEvent, UserMessageEvent) and MCP tools/call params.
+type parsedPayload struct {
+	Params struct {
+		Name string `json:"name"`
+		Msg  struct {
+			Model          string `json:"model"`
+			CWD            string `json:"cwd"`
+			ApprovalPolicy string `json:"approval_policy"`
+			ThreadName     string `json:"thread_name"`
+			Message        string `json:"message"`
+		} `json:"msg"`
+	} `json:"params"`
+}
+
+func parsePayload(payload json.RawMessage) parsedPayload {
+	var p parsedPayload
+	_ = json.Unmarshal(payload, &p)
+	return p
+}
+
+// derivePersistentRows populates the sessions and mcp_calls tables from the
+// ingested event. The events table is authoritative; these are denormalized
+// indexes the UI queries directly. Errors are swallowed intentionally: a
+// failed upsert here must not reject the underlying event write.
+func derivePersistentRows(ctx context.Context, app *hub.App, body ingestEvent, occurredAt int64) {
+	if app.Store == nil {
+		return
+	}
+	p := parsePayload(body.Payload)
+	if body.SessionID != "" && body.ClientSourceKey != "" {
+		model, cwd, approval := extractSessionFields(body.EventType, p)
+		_ = app.Store.UpsertSession(ctx, sqlite.SessionRecord{
+			SessionID:       body.SessionID,
+			ClientSourceKey: body.ClientSourceKey,
+			Model:           model,
+			CWD:             cwd,
+			ApprovalPolicy:  approval,
+		})
+		writeSessionTitle(ctx, app, body.SessionID, body.EventType, p)
+	}
+	if body.RequestID != "" && body.Direction == directionUpstreamToCodex && body.EventType == "tools/call" {
+		if p.Params.Name != "" && body.ProxyInstanceID != "" && body.ClientSourceKey != "" {
+			_ = app.Store.UpsertMCPCall(ctx, sqlite.MCPCallRecord{
+				RequestID:       body.RequestID,
+				ProxyInstanceID: body.ProxyInstanceID,
+				ClientSourceKey: body.ClientSourceKey,
+				SessionID:       body.SessionID,
+				ToolName:        p.Params.Name,
+				StartedAt:       occurredAt,
+			})
+		}
+	}
+	if body.RequestID != "" && body.Direction == directionCodexToUpstream &&
+		(body.Category == categoryResponse || body.Category == categoryError) {
+		status := "ok"
+		if body.Category == categoryError {
+			status = "error"
+		}
+		_ = app.Store.CompleteMCPCall(ctx, body.RequestID, occurredAt, status)
+	}
+}
+
+func extractSessionFields(eventType string, p parsedPayload) (model, cwd, approval string) {
+	if eventType != "session_configured" {
+		return "", "", ""
+	}
+	return p.Params.Msg.Model, p.Params.Msg.CWD, p.Params.Msg.ApprovalPolicy
+}
+
+// writeSessionTitle dispatches to the title-write variant matching the
+// event's priority: thread_name_updated wins unconditionally, while
+// session_configured.thread_name and user_message fall back to
+// fill-if-empty. Other events contribute no title.
+func writeSessionTitle(ctx context.Context, app *hub.App, sessionID, eventType string, p parsedPayload) {
+	switch eventType {
+	case "thread_name_updated":
+		if p.Params.Msg.ThreadName != "" {
+			_ = app.Store.SetSessionTitleAlways(ctx, sessionID, p.Params.Msg.ThreadName)
+		}
+	case "session_configured":
+		if p.Params.Msg.ThreadName != "" {
+			_ = app.Store.SetSessionTitleIfEmpty(ctx, sessionID, p.Params.Msg.ThreadName)
+		}
+	case "user_message":
+		if s := summarizeForTitle(p.Params.Msg.Message); s != "" {
+			_ = app.Store.SetSessionTitleIfEmpty(ctx, sessionID, s)
+		}
+	}
+}
+
+func summarizeForTitle(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	joined := strings.Join(strings.Fields(s), " ")
+	const max = 80
+	if len(joined) <= max {
+		return joined
+	}
+	return joined[:max] + "…"
 }
 
 func parseTimestampMs(ts string) int64 {

@@ -15,6 +15,7 @@ export interface ClientSource {
 export interface Session {
   thread_id: string
   source_key: string
+  title?: string
   model?: string
   cwd?: string
   approval_policy?: string

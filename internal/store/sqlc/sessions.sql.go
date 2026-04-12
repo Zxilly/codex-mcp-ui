@@ -11,7 +11,7 @@ import (
 )
 
 const getSession = `-- name: GetSession :one
-SELECT session_id, client_source_key, model, cwd, approval_policy,
+SELECT session_id, client_source_key, model, cwd, approval_policy, title,
        first_seen_at, last_seen_at
 FROM sessions
 WHERE session_id = ?
@@ -26,6 +26,7 @@ func (q *Queries) GetSession(ctx context.Context, sessionID string) (Session, er
 		&i.Model,
 		&i.Cwd,
 		&i.ApprovalPolicy,
+		&i.Title,
 		&i.FirstSeenAt,
 		&i.LastSeenAt,
 	)
@@ -33,7 +34,7 @@ func (q *Queries) GetSession(ctx context.Context, sessionID string) (Session, er
 }
 
 const listSessionsBySource = `-- name: ListSessionsBySource :many
-SELECT session_id, client_source_key, model, cwd, approval_policy,
+SELECT session_id, client_source_key, model, cwd, approval_policy, title,
        first_seen_at, last_seen_at
 FROM sessions
 WHERE client_source_key = ?
@@ -55,6 +56,7 @@ func (q *Queries) ListSessionsBySource(ctx context.Context, clientSourceKey stri
 			&i.Model,
 			&i.Cwd,
 			&i.ApprovalPolicy,
+			&i.Title,
 			&i.FirstSeenAt,
 			&i.LastSeenAt,
 		); err != nil {

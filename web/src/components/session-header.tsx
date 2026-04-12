@@ -17,14 +17,15 @@ export function SessionHeader({ session, source }: SessionHeaderProps) {
       </header>
     )
   }
+  const title = session.title?.trim() || `thread ${session.thread_id}`
   return (
     <header className="flex items-start justify-between gap-4 border-b p-4">
       <div className="min-w-0">
-        <h1 className="truncate text-lg font-semibold">
-          {`${source.client_name} | pid ${source.pid}`}
+        <h1 className="truncate text-lg font-semibold" title={session.title ?? session.thread_id}>
+          {title}
         </h1>
         <p className="truncate font-mono text-xs text-muted-foreground">
-          {`thread ${session.thread_id}`}
+          {`${source.client_name} | pid ${source.pid} | ${session.thread_id}`}
         </p>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2">

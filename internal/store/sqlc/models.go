@@ -64,6 +64,7 @@ type Session struct {
 	Model           sql.NullString
 	Cwd             sql.NullString
 	ApprovalPolicy  sql.NullString
+	Title           sql.NullString
 	FirstSeenAt     int64
 	LastSeenAt      int64
 }

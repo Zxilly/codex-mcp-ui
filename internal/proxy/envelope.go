@@ -81,9 +81,10 @@ func Normalize(direction string, frame []byte) EventEnvelope {
 	if method != "" {
 		env.EventType = method
 		env.Category = CategoryJSONRPCRequest
-	} else if _, ok := msg["result"]; ok {
+	} else if result, ok := msg["result"]; ok {
 		env.EventType = "response"
 		env.Category = CategoryResponse
+		env.SessionID = extractThreadIDFromResult(result)
 	} else if _, ok := msg["error"]; ok {
 		env.EventType = "error"
 		env.Category = CategoryError
@@ -92,7 +93,9 @@ func Normalize(direction string, frame []byte) EventEnvelope {
 		env.RequestID = trimJSONString(id)
 	}
 	if params, ok := msg["params"]; ok {
-		env.SessionID = extractSessionID(params)
+		if sid := extractSessionID(params); sid != "" {
+			env.SessionID = sid
+		}
 	}
 	return env
 }
@@ -146,11 +149,31 @@ func extractSessionID(params json.RawMessage) string {
 			ThreadID string `json:"threadId"`
 		} `json:"_meta"`
 		SessionID string `json:"session_id"`
+		// tools/call for codex-reply threads the conversation id through
+		// arguments; surface it so the hub links the call to its session.
+		Arguments struct {
+			ThreadID string `json:"threadId"`
+		} `json:"arguments"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return ""
 	}
-	return firstNonEmpty(p.Meta.ThreadID, p.SessionID)
+	return firstNonEmpty(p.Meta.ThreadID, p.SessionID, p.Arguments.ThreadID)
+}
+
+// extractThreadIDFromResult pulls threadId out of a tools/call response body.
+// Codex's MCP server places it under structured_content (serialized as
+// structuredContent via camelCase) — see codex-rs/mcp-server/src/codex_tool_runner.rs.
+func extractThreadIDFromResult(result json.RawMessage) string {
+	var r struct {
+		StructuredContent struct {
+			ThreadID string `json:"threadId"`
+		} `json:"structuredContent"`
+	}
+	if err := json.Unmarshal(result, &r); err != nil {
+		return ""
+	}
+	return r.StructuredContent.ThreadID
 }
 
 func trimJSONString(raw json.RawMessage) string {

@@ -74,6 +74,11 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+@theme inline {
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -85,5 +90,10 @@
   }
   body {
     @apply antialiased;
+  }
+
+  @keyframes caret-blink {
+    0%, 55% { opacity: 1; }
+    56%, 100% { opacity: 0; }
   }
 }

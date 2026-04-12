@@ -19,6 +19,23 @@ func TestNormalizeDirection(t *testing.T) {
 	}
 }
 
+func TestNormalizeExtractsThreadIDFromCodexReplyArguments(t *testing.T) {
+	frame := []byte(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"codex-reply","arguments":{"threadId":"thr-abc","prompt":"hi"}}}`)
+	env := Normalize("upstream", frame)
+	require.Equal(t, "thr-abc", env.SessionID,
+		"threadId from codex-reply arguments should surface as SessionID so the hub links the call to its thread")
+	require.Equal(t, "tools/call", env.EventType)
+}
+
+func TestNormalizeExtractsThreadIDFromResponseStructuredContent(t *testing.T) {
+	// Shape mirrors CallToolResult produced by codex-rs/mcp-server/src/codex_tool_runner.rs
+	// (structured_content serialized via camelCase).
+	frame := []byte(`{"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"text","text":"hi"}],"structuredContent":{"threadId":"thr-abc","content":"hi"}}}`)
+	env := Normalize("downstream", frame)
+	require.Equal(t, "thr-abc", env.SessionID)
+	require.Equal(t, CategoryResponse, env.Category)
+}
+
 func TestNormalizeRawFrameOnInvalidJSON(t *testing.T) {
 	env := Normalize("downstream", []byte("not-json"))
 	require.Equal(t, CategoryRawFrame, env.Category)

@@ -68,6 +68,7 @@ type ClientSourceDTO struct {
 type SessionDTO struct {
 	ThreadID       string `json:"thread_id"`
 	SourceKey      string `json:"source_key"`
+	Title          string `json:"title,omitempty"`
 	Model          string `json:"model,omitempty"`
 	CWD            string `json:"cwd,omitempty"`
 	ApprovalPolicy string `json:"approval_policy,omitempty"`

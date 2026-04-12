@@ -273,6 +273,38 @@ func (s *Store) UpsertMCPCall(ctx context.Context, r MCPCallRecord) error {
 	})
 }
 
+func (s *Store) ListMCPCallsBySource(ctx context.Context, sourceKey string) ([]MCPCallRecord, error) {
+	rows, err := s.q.ListMCPCallsBySource(ctx, sourceKey)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]MCPCallRecord, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, MCPCallRecord{
+			RequestID:        r.RequestID,
+			ProxyInstanceID:  r.ProxyInstanceID,
+			ClientSourceKey:  r.ClientSourceKey,
+			SessionID:        r.SessionID.String,
+			ToolName:         r.ToolName,
+			StartedAt:        r.StartedAt,
+			CompletedAt:      r.CompletedAt.Int64,
+			CompletionStatus: r.CompletionStatus.String,
+		})
+	}
+	return out, nil
+}
+
+func (s *Store) CompleteMCPCall(ctx context.Context, requestID string, completedAt int64, status string) error {
+	if completedAt == 0 {
+		completedAt = now()
+	}
+	return s.q.CompleteMCPCall(ctx, sqlc.CompleteMCPCallParams{
+		CompletedAt:      nullInt64(completedAt),
+		CompletionStatus: nullString(status),
+		RequestID:        requestID,
+	})
+}
+
 // --- Sessions ---
 
 type SessionRecord struct {
@@ -281,8 +313,70 @@ type SessionRecord struct {
 	Model           string
 	CWD             string
 	ApprovalPolicy  string
+	Title           string
 	FirstSeenAt     int64
 	LastSeenAt      int64
+}
+
+// BackfillSessionsFromEvents reconstructs missing rows in the sessions table
+// from any events that reference an unknown session_id. This lets databases
+// written by older hub versions — which ingested events but never populated
+// sessions — show up in the dashboard on next startup. Once any session row
+// exists we assume the live ingest path is keeping sessions in sync and skip
+// the GROUP BY scan to avoid paying for it on every hub start.
+func (s *Store) BackfillSessionsFromEvents(ctx context.Context) (int64, error) {
+	var have int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM sessions`).Scan(&have); err != nil {
+		return 0, err
+	}
+	if have > 0 {
+		return 0, nil
+	}
+	res, err := s.db.ExecContext(ctx, `
+		INSERT OR IGNORE INTO sessions (session_id, client_source_key, first_seen_at, last_seen_at)
+		SELECT
+			e.session_id,
+			COALESCE(e.client_source_key, ''),
+			MIN(e.occurred_at),
+			MAX(e.occurred_at)
+		FROM events e
+		WHERE e.session_id IS NOT NULL
+		  AND e.session_id != ''
+		  AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.session_id = e.session_id)
+		GROUP BY e.session_id
+	`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
+// SetSessionTitleAlways writes the session's display title unconditionally,
+// overwriting any previous value. Use for authoritative sources such as
+// Codex's thread_name_updated event. Callers must have already
+// UpsertSession'd the row so the UPDATE has a target.
+func (s *Store) SetSessionTitleAlways(ctx context.Context, sessionID, title string) error {
+	if sessionID == "" || title == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE sessions SET title = ? WHERE session_id = ?`,
+		title, sessionID)
+	return err
+}
+
+// SetSessionTitleIfEmpty fills the title only when the row has none yet.
+// Use for fallback sources such as session_configured.thread_name or the
+// first user_message text, where a later authoritative rename must still win.
+func (s *Store) SetSessionTitleIfEmpty(ctx context.Context, sessionID, title string) error {
+	if sessionID == "" || title == "" {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE sessions SET title = ? WHERE session_id = ? AND (title IS NULL OR title = '')`,
+		title, sessionID)
+	return err
 }
 
 func (s *Store) UpsertSession(ctx context.Context, r SessionRecord) error {
@@ -309,6 +403,7 @@ func (s *Store) GetSession(ctx context.Context, sessionID string) (SessionRecord
 		Model:           r.Model.String,
 		CWD:             r.Cwd.String,
 		ApprovalPolicy:  r.ApprovalPolicy.String,
+		Title:           r.Title.String,
 		FirstSeenAt:     r.FirstSeenAt,
 		LastSeenAt:      r.LastSeenAt,
 	}, nil
@@ -327,6 +422,7 @@ func (s *Store) ListSessionsBySource(ctx context.Context, sourceKey string) ([]S
 			Model:           r.Model.String,
 			CWD:             r.Cwd.String,
 			ApprovalPolicy:  r.ApprovalPolicy.String,
+			Title:           r.Title.String,
 			FirstSeenAt:     r.FirstSeenAt,
 			LastSeenAt:      r.LastSeenAt,
 		})

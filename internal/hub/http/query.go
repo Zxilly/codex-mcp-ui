@@ -174,6 +174,7 @@ func toSessionDTO(r sqlite.SessionRecord) api.SessionDTO {
 	return api.SessionDTO{
 		ThreadID:       r.SessionID,
 		SourceKey:      r.ClientSourceKey,
+		Title:          r.Title,
 		Model:          r.Model,
 		CWD:            r.CWD,
 		ApprovalPolicy: r.ApprovalPolicy,

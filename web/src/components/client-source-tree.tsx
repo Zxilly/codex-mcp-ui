@@ -37,17 +37,24 @@ export function ClientSourceTree({
             <ul className="flex flex-col gap-1">
               {sessions.map((s) => {
                 const active = s.thread_id === selectedThreadId
+                const label = s.title?.trim() || s.thread_id
                 return (
                   <li key={s.thread_id}>
                     <button
                       type="button"
                       onClick={() => onSelectSession(s.thread_id)}
+                      title={s.title ? `${s.title}\n${s.thread_id}` : s.thread_id}
                       className={cn(
-                        "w-full rounded-md px-2 py-1 text-left font-mono text-xs hover:bg-accent",
+                        "flex w-full flex-col gap-0.5 rounded-md px-2 py-1 text-left hover:bg-accent",
                         active && "bg-accent text-accent-foreground",
                       )}
                     >
-                      {s.thread_id}
+                      <span className="truncate text-xs">{label}</span>
+                      {s.title && (
+                        <span className="truncate font-mono text-[10px] text-muted-foreground">
+                          {s.thread_id}
+                        </span>
+                      )}
                     </button>
                   </li>
                 )

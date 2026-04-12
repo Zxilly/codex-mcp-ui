@@ -57,6 +57,9 @@ func NewApp(cfg Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Older databases ingested events without populating sessions; repair
+	// them here so the dashboard lights up on upgrade.
+	_, _ = store.BackfillSessionsFromEvents(context.Background())
 	app.Store = store
 	return app, nil
 }

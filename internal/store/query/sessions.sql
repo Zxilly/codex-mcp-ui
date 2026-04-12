@@ -11,13 +11,13 @@ ON CONFLICT(session_id) DO UPDATE SET
   last_seen_at = excluded.last_seen_at;
 
 -- name: GetSession :one
-SELECT session_id, client_source_key, model, cwd, approval_policy,
+SELECT session_id, client_source_key, model, cwd, approval_policy, title,
        first_seen_at, last_seen_at
 FROM sessions
 WHERE session_id = ?;
 
 -- name: ListSessionsBySource :many
-SELECT session_id, client_source_key, model, cwd, approval_policy,
+SELECT session_id, client_source_key, model, cwd, approval_policy, title,
        first_seen_at, last_seen_at
 FROM sessions
 WHERE client_source_key = ?
