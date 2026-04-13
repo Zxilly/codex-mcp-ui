@@ -41,6 +41,11 @@ export interface EventRecord {
   payload: unknown
 }
 
+export interface EventPage {
+  items: EventRecord[]
+  next_cursor?: string
+}
+
 export interface Handshake {
   hub_version: string
   proxy_instance_id?: string

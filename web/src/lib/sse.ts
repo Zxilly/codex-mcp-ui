@@ -4,17 +4,20 @@ import { fetchEventSource } from "@microsoft/fetch-event-source"
 export interface SSEOptions {
   sourceKey?: string
   threadId?: string
+  since?: string
   onEvent: (event: EventRecord) => void
   onStatusChange?: (status: "connecting" | "live" | "disconnected") => void
   onParseError?: (err: unknown) => void
 }
 
-export function buildStreamURL(opts: Pick<SSEOptions, "sourceKey" | "threadId">): string {
+export function buildStreamURL(opts: Pick<SSEOptions, "sourceKey" | "threadId" | "since">): string {
   const qs = new URLSearchParams()
   if (opts.sourceKey)
     qs.set("source_key", opts.sourceKey)
   if (opts.threadId)
     qs.set("thread_id", opts.threadId)
+  if (opts.since)
+    qs.set("since", opts.since)
   return `/api/v1/stream${qs.size > 0 ? `?${qs.toString()}` : ""}`
 }
 

@@ -1,6 +1,6 @@
 import type {
   ClientSource,
-  EventRecord,
+  EventPage,
   Session,
   SessionDetail,
 } from "./types"
@@ -26,15 +26,20 @@ export const api = {
     ).then(r => r.items),
   session: (threadId: string) =>
     getJSON<SessionDetail>(`/sessions/${encodeURIComponent(threadId)}`),
-  events: (threadId: string, opts?: { limit?: number, before?: string }) => {
+  eventsPage: (threadId: string, opts?: { limit?: number, cursor?: string }) => {
     const qs = new URLSearchParams()
     if (opts?.limit)
       qs.set("limit", String(opts.limit))
-    if (opts?.before)
-      qs.set("before", opts.before)
+    if (opts?.cursor)
+      qs.set("cursor", opts.cursor)
     const suffix = qs.size > 0 ? `?${qs.toString()}` : ""
-    return getJSON<{ items: EventRecord[] }>(
+    return getJSON<EventPage>(
       `/sessions/${encodeURIComponent(threadId)}/events${suffix}`,
-    ).then(r => r.items)
+    )
   },
+  events: (threadId: string, opts?: { limit?: number, before?: string }) =>
+    api.eventsPage(threadId, {
+      limit: opts?.limit,
+      cursor: opts?.before,
+    }).then(r => r.items),
 }

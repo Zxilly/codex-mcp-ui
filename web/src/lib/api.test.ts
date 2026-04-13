@@ -57,12 +57,12 @@ describe("api client", () => {
     expect(detail.client_source.client_name).toBe("Claude")
   })
 
-  it("passes limit and before through as query string", async () => {
-    await api.events("t1", { limit: 10, before: "evt-x" })
+  it("passes limit and cursor through as query string", async () => {
+    await api.eventsPage("t1", { limit: 10, cursor: "1000|evt-a" })
     const url = calls.at(-1)?.[0] as string
     expect(url).toMatch(/\/api\/v1\/sessions\/t1\/events\?/)
     expect(url).toContain("limit=10")
-    expect(url).toContain("before=evt-x")
+    expect(url).toContain("cursor=1000%7Cevt-a")
   })
 
   it("throws when the response is not ok", async () => {

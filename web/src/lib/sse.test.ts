@@ -25,4 +25,8 @@ describe("buildStreamURL", () => {
     expect(params.get("source_key")).toBe("s")
     expect(params.get("thread_id")).toBe("t")
   })
+
+  it("builds a stream URL with since for replay", () => {
+    expect(buildStreamURL({ threadId: "t1", since: "evt-9" })).toContain("since=evt-9")
+  })
 })
