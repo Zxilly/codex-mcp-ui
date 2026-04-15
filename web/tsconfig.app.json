@@ -5,15 +5,12 @@
     "jsx": "react-jsx",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "moduleDetection": "force",
-
-    "module": "esnext",
     "moduleResolution": "bundler",
     "paths": {
       "@/*": ["./src/*"]
     },
 
     "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
-    "allowImportingTsExtensions": true,
     "noFallthroughCasesInSwitch": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -22,5 +19,5 @@
     "erasableSyntaxOnly": true,
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }

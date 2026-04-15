@@ -9,7 +9,7 @@ describe("utils", () => {
   })
 
   it("formats payloads and falls back when stringify fails", () => {
-    expect(prettyPayload({ ok: true })).toBe('{\n  "ok": true\n}')
+    expect(prettyPayload({ ok: true })).toBe("{\n  \"ok\": true\n}")
 
     const circular: { self?: unknown } = {}
     circular.self = circular
@@ -18,7 +18,7 @@ describe("utils", () => {
 
   it("builds compact payload previews for strings, objects, and invalid JSON payloads", () => {
     expect(compactPayloadPreview("plain text", 20)).toBe("plain text")
-    expect(compactPayloadPreview({ ok: true }, 20)).toBe('{"ok":true}')
+    expect(compactPayloadPreview({ ok: true }, 20)).toBe("{\"ok\":true}")
 
     const circular: { self?: unknown } = {}
     circular.self = circular

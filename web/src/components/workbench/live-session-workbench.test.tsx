@@ -1,10 +1,10 @@
+import type { ReadonlyAssistantThread } from "@/lib/assistant-projection"
 import type { EventRecord, Session } from "@/lib/types"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import { fixtureClientSource, fixtureSession } from "@/lib/fixtures"
-import type { ReadonlyAssistantThread } from "@/lib/assistant-projection"
 import { LiveSessionWorkbench } from "./session-workbench"
 
 const sourceAlpha = fixtureClientSource
@@ -31,6 +31,34 @@ const sessionBeta: Session = {
   approval_policy: "never",
   sandbox: "read-only",
   status: "idle",
+}
+
+let currentHashThreadId: string | null = null
+let currentSetHashThreadId = vi.fn<(threadId: string | null) => void>()
+let currentHistoryForThread = (threadId: string | null) => ({
+  events: threadId === sessionBeta.thread_id
+    ? [makeEvent(sessionBeta.thread_id, sourceBeta.source_key, "Beta rollout is stable")]
+    : [makeEvent(sessionAlpha.thread_id, sourceAlpha.source_key, "Alpha summary ready")],
+  status: "ready" as const,
+  error: null,
+  refreshKey: 1,
+})
+
+function readHashThreadId(): [string | null, (next: string | null) => void] {
+  return [currentHashThreadId, currentSetHashThreadId]
+}
+
+function readSessionHistory(threadId: string | null) {
+  return currentHistoryForThread(threadId)
+}
+
+function ReadonlyAssistantThreadComponent({
+  thread,
+}: {
+  thread: ReadonlyAssistantThread | null
+}) {
+  const firstPart = thread?.messages[0]?.parts[0]
+  return <div>{firstPart && "text" in firstPart ? firstPart.text : ""}</div>
 }
 
 function makeEvent(threadId: string, sourceKey: string, message: string): EventRecord {
@@ -63,7 +91,16 @@ function renderLiveWorkbench(
     sessionDetailRefetchIntervalMs?: number
   } = {},
 ) {
-  const setHashThreadId = vi.fn()
+  currentHashThreadId = hashThreadId
+  currentSetHashThreadId = vi.fn<(threadId: string | null) => void>()
+  currentHistoryForThread = (threadId: string | null) => ({
+    events: threadId === sessionBeta.thread_id
+      ? [makeEvent(sessionBeta.thread_id, sourceBeta.source_key, "Beta rollout is stable")]
+      : [makeEvent(sessionAlpha.thread_id, sourceAlpha.source_key, "Alpha summary ready")],
+    status: "ready",
+    error: null,
+    refreshKey: 1,
+  })
   const sessionSpy = vi.fn(async (threadId: string) => ({
     session: threadId === sessionBeta.thread_id ? sessionBeta : sessionAlpha,
     client_source: threadId === sessionBeta.thread_id ? sourceBeta : sourceAlpha,
@@ -92,17 +129,10 @@ function renderLiveWorkbench(
       <LiveSessionWorkbench
         dependencies={{
           api: apiClient,
-          useHashThreadId: () => [hashThreadId, setHashThreadId],
+          useHashThreadId: readHashThreadId,
           sessionDetailRefetchIntervalMs: options.sessionDetailRefetchIntervalMs ?? 15_000,
           workbenchDependencies: {
-            useSessionHistory: (threadId: string | null) => ({
-              events: threadId === sessionBeta.thread_id
-                ? [makeEvent(sessionBeta.thread_id, sourceBeta.source_key, "Beta rollout is stable")]
-                : [makeEvent(sessionAlpha.thread_id, sourceAlpha.source_key, "Alpha summary ready")],
-              status: "ready",
-              error: null,
-              refreshKey: 1,
-            }),
+            useSessionHistory: readSessionHistory,
             projectReadonlyAssistantThread: (sessionDetail): ReadonlyAssistantThread => ({
               header: {
                 title: sessionDetail.session.title ?? sessionDetail.session.thread_id,
@@ -127,9 +157,7 @@ function renderLiveWorkbench(
                 }],
               }],
             }),
-            ReadonlyAssistantThreadComponent: ({ thread }) => (
-              <div>{thread?.messages[0]?.parts[0] && "text" in thread.messages[0].parts[0] ? thread.messages[0].parts[0].text : ""}</div>
-            ),
+            ReadonlyAssistantThreadComponent,
           },
         }}
       />
@@ -139,7 +167,7 @@ function renderLiveWorkbench(
   return {
     apiClient,
     sessionSpy,
-    setHashThreadId,
+    setHashThreadId: currentSetHashThreadId,
   }
 }
 

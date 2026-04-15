@@ -1,6 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query"
-import { LiveSessionWorkbench } from "@/components/workbench/session-workbench"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { LiveSessionWorkbench } from "@/components/workbench/session-workbench"
 import { queryClient } from "@/lib/query-client"
 
 export default function App() {

@@ -3,7 +3,6 @@ import type {
   ReadonlyAssistantPart,
   ReadonlyAssistantThread as ReadonlyAssistantThreadProjection,
 } from "@/lib/assistant-projection"
-import { asRecord } from "@/lib/assistant-projection"
 import type { SessionHistoryStatus } from "@/lib/session-history"
 import {
   AssistantRuntimeProvider,
@@ -11,12 +10,17 @@ import {
   ThreadPrimitive,
   useAuiState,
 } from "@assistant-ui/react"
-import { useMemo } from "react"
 import { AlertCircle, Bot, User } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import {
+  createContext,
+  use,
+  useMemo,
+} from "react"
 import { MarkdownBody } from "@/components/message-block"
-import { prettyPayload } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { asRecord } from "@/lib/assistant-projection"
 import { useReadonlyAssistantRuntime } from "@/lib/readonly-assistant-runtime"
+import { prettyPayload } from "@/lib/utils"
 
 interface ReadonlyAssistantThreadProps {
   thread: ReadonlyAssistantThreadProjection | null
@@ -24,68 +28,67 @@ interface ReadonlyAssistantThreadProps {
   error: Error | null
 }
 
+const ProjectedMessagesContext = createContext<readonly ReadonlyAssistantMessage[]>([])
+
+const MESSAGE_COMPONENTS = {
+  UserMessage: ReadonlyMessage,
+  AssistantMessage: ReadonlyMessage,
+}
+
 export function ReadonlyAssistantThread({
   thread,
   status,
   error,
 }: ReadonlyAssistantThreadProps) {
-  const runtime = useReadonlyAssistantRuntime(thread?.messages ?? [])
-  const header = thread?.header
   const projectedMessages = thread?.messages ?? []
-  const messageComponents = useMemo(
-    () => ({
-      UserMessage: () => <ReadonlyMessage projectedMessages={projectedMessages} />,
-      AssistantMessage: () => <ReadonlyMessage projectedMessages={projectedMessages} />,
-    }),
-    [projectedMessages],
-  )
+  const runtime = useReadonlyAssistantRuntime(projectedMessages)
+  const header = thread?.header
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-background">
-        {header && (
-          <header className="flex items-start justify-between gap-3 border-b px-4 py-3">
-            <div className="min-w-0">
-              <h2 className="truncate text-sm font-semibold">{header.title}</h2>
-              <p className="truncate font-mono text-xs text-muted-foreground">
-                {header.subtitle}
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {header.badges.map(badge => (
-                <Badge key={badge} variant="secondary">
-                  {badge}
-                </Badge>
-              ))}
-            </div>
-          </header>
-        )}
-        <ThreadPrimitive.Empty>
-          <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
-            {status === "loading" ? "Loading conversation..." : "No conversation history yet."}
-          </div>
-        </ThreadPrimitive.Empty>
-        <ThreadPrimitive.Viewport className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-          <div className="flex flex-col gap-4">
-            {error && (
-              <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{error.message}</span>
+      <ProjectedMessagesContext value={projectedMessages}>
+        <ThreadPrimitive.Root className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border bg-background">
+          {header && (
+            <header className="flex items-start justify-between gap-3 border-b px-4 py-3">
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold">{header.title}</h2>
+                <p className="truncate font-mono text-xs text-muted-foreground">
+                  {header.subtitle}
+                </p>
               </div>
-            )}
-            <ThreadPrimitive.Messages components={messageComponents} />
-          </div>
-        </ThreadPrimitive.Viewport>
-      </ThreadPrimitive.Root>
+              <div className="flex flex-wrap gap-2">
+                {header.badges.map(badge => (
+                  <Badge key={badge} variant="secondary">
+                    {badge}
+                  </Badge>
+                ))}
+              </div>
+            </header>
+          )}
+          <ThreadPrimitive.Empty>
+            <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
+              {status === "loading" ? "Loading conversation..." : "No conversation history yet."}
+            </div>
+          </ThreadPrimitive.Empty>
+          <ThreadPrimitive.Viewport className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+            <div className="flex flex-col gap-4">
+              {error && (
+                <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <span>{error.message}</span>
+                </div>
+              )}
+              <ThreadPrimitive.Messages components={MESSAGE_COMPONENTS} />
+            </div>
+          </ThreadPrimitive.Viewport>
+        </ThreadPrimitive.Root>
+      </ProjectedMessagesContext>
     </AssistantRuntimeProvider>
   )
 }
 
-function ReadonlyMessage({
-  projectedMessages,
-}: {
-  projectedMessages: readonly ReadonlyAssistantMessage[]
-}) {
+function ReadonlyMessage() {
+  const projectedMessages = use(ProjectedMessagesContext)
   const runtimeMessage = useAuiState(state => state.message)
   const message = projectedMessages[runtimeMessage.index]
   const Icon = runtimeMessage.role === "assistant" ? Bot : User
@@ -109,9 +112,9 @@ function ReadonlyMessage({
           </span>
         </div>
         <div className="space-y-2">
-          {message.parts.map((part, index) => (
+          {message.parts.map(part => (
             <ReadonlyMessagePart
-              key={`${message.id}-${index}`}
+              key={partKey(message.id, part)}
               part={part}
               role={message.role}
             />
@@ -120,6 +123,17 @@ function ReadonlyMessage({
       </div>
     </MessagePrimitive.Root>
   )
+}
+
+function partKey(messageId: string, part: ReadonlyAssistantPart) {
+  switch (part.type) {
+    case "text":
+      return `${messageId}-${part.type}-${part.eventIds?.join("-") ?? part.text}`
+    case "reasoning":
+      return `${messageId}-${part.type}-${part.variant}-${part.text}`
+    default:
+      return `${messageId}-${part.type}-${part.title}`
+  }
 }
 
 function ReadonlyMessagePart({
@@ -237,4 +251,3 @@ function memoryCitationLabel(value: unknown) {
   const count = Array.isArray(record.entries) ? record.entries.length : 0
   return count === 1 ? "1 memory citation" : `${count} memory citations`
 }
-

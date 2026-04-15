@@ -1,7 +1,7 @@
 import type { EventRecord, SessionDetail } from "@/lib/types"
 import { describe, expect, it } from "vitest"
-import { fixtureClientSource, fixtureSession } from "./fixtures"
 import { projectReadonlyAssistantThread } from "./assistant-projection"
+import { fixtureClientSource, fixtureSession } from "./fixtures"
 
 function makeSessionDetail(overrides?: Partial<SessionDetail["session"]>): SessionDetail {
   return {
@@ -988,7 +988,7 @@ describe("projectReadonlyAssistantThread", () => {
 
   it("falls back when command metadata or payload wrappers are missing", () => {
     const utf16Bytes = Array.from("hello from utf16")
-      .flatMap(char => {
+      .flatMap((char) => {
         const code = char.charCodeAt(0)
         return [code & 0xFF, code >> 8]
       })

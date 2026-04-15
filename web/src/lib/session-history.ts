@@ -1,8 +1,8 @@
+import type { SSEOptions } from "./sse"
+import type { EventRecord, PaginatedEventsResponse } from "./types"
 import { useEffect, useRef, useState } from "react"
 import { api } from "./api"
 import { subscribeEvents } from "./sse"
-import type { SSEOptions } from "./sse"
-import type { EventRecord, PaginatedEventsResponse } from "./types"
 
 const PAGE_LIMIT = 500
 const historyCache = new Map<string, EventRecord[]>()
@@ -147,10 +147,6 @@ export function useSessionHistory(
   useEffect(() => {
     if (!threadId) {
       eventsRef.current = []
-      setState(prev => ({
-        ...INITIAL_STATE,
-        refreshKey: prev.refreshKey,
-      }))
       return
     }
 
@@ -162,7 +158,6 @@ export function useSessionHistory(
     let handoffComplete = false
     let cancelled = false
 
-    setState(prev => initialThreadState(threadId, prev.refreshKey))
     eventsRef.current = cachedEvents
 
     const updateEvents = (

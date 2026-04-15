@@ -1,7 +1,6 @@
-import { render, screen } from "@testing-library/react"
-import { within } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
 import type { ReadonlyAssistantThread as ReadonlyAssistantThreadProjection } from "@/lib/assistant-projection"
+import { render, screen, within } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
 import { ReadonlyAssistantThread } from "./readonly-assistant-thread"
 
 const thread: ReadonlyAssistantThreadProjection = {

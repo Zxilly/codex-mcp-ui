@@ -1,39 +1,45 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { render } from "vitest-browser-react"
 
-vi.mock("@/components/workbench/readonly-assistant-thread", () => ({
-  ReadonlyAssistantThread: ({
-    thread,
-    error,
-    status,
-  }: {
-    thread: {
-      messages?: Array<{
-        id: string
-        parts: Array<{ type: string, text?: string }>
-      }>
-    } | null
-    error: Error | null
-    status: string
-  }) => (
+import App from "@/App"
+import { queryClient } from "@/lib/query-client"
+
+interface ReadonlyThreadStubProps {
+  thread: {
+    messages?: Array<{
+      id: string
+      parts: Array<{ type: string, text?: string }>
+    }>
+  } | null
+  error: Error | null
+  status: string
+}
+
+function ReadonlyAssistantThreadStub({
+  thread,
+  error,
+  status,
+}: ReadonlyThreadStubProps) {
+  return (
     <div data-testid="readonly-thread-stub">
       <div>{status}</div>
       {error && <div>{error.message}</div>}
       {thread?.messages?.map(message => (
         <div key={message.id}>
           {message.parts.map((part, index) => (
-            <span key={`${message.id}-${index}`}>
+            <span key={`${message.id}-${part.type}-${part.text ?? index}`}>
               {part.type === "text" ? part.text : part.type}
             </span>
           ))}
         </div>
       ))}
     </div>
-  ),
-}))
+  )
+}
 
-import App from "@/App"
-import { queryClient } from "@/lib/query-client"
+vi.mock("@/components/workbench/readonly-assistant-thread", () => ({
+  ReadonlyAssistantThread: ReadonlyAssistantThreadStub,
+}))
 
 const SOURCE_ALPHA = "claude-desktop-18244"
 const SOURCE_BETA = "codex-cli-991"

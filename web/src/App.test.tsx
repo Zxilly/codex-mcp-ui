@@ -1,18 +1,25 @@
+import type { PropsWithChildren } from "react"
 import { render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import App from "./App"
 
+function MockLiveSessionWorkbench() {
+  return <div>mock workbench</div>
+}
+
+function MockErrorBoundary({ children }: PropsWithChildren) {
+  return <div data-testid="error-boundary">{children}</div>
+}
+
 vi.mock("@/components/workbench/session-workbench", () => ({
-  LiveSessionWorkbench: () => <div>mock workbench</div>,
+  LiveSessionWorkbench: MockLiveSessionWorkbench,
 }))
 
 vi.mock("@/components/error-boundary", () => ({
-  ErrorBoundary: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="error-boundary">{children}</div>
-  ),
+  ErrorBoundary: MockErrorBoundary,
 }))
 
-describe("App", () => {
+describe("app", () => {
   it("wraps the workbench in the error boundary and query provider shell", () => {
     render(<App />)
 

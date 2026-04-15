@@ -1,9 +1,9 @@
 import {
   MARKDOWN_COMPONENTS,
-  Markdown,
   REHYPE_PLUGINS,
   REMARK_PLUGINS,
-} from "@/components/markdown/markdown-runtime"
+} from "@/components/markdown/markdown-config"
+import { Markdown } from "@/components/markdown/markdown-runtime"
 import { cn } from "@/lib/utils"
 
 export type MessageRole = "user" | "agent" | "reasoning"

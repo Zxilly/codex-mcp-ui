@@ -4,12 +4,12 @@ import {
   useEffect,
   useMemo,
 } from "react"
-import { api } from "@/lib/api"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
 import { MetadataPanel } from "@/components/metadata-panel"
 import { RawEventTable } from "@/components/raw-event-table"
 import { SessionHeader } from "@/components/session-header"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { api } from "@/lib/api"
 import { projectReadonlyAssistantThread } from "@/lib/assistant-projection"
 import { useSessionHistory } from "@/lib/session-history"
 import { resolveThreadSelection } from "@/lib/thread-selection"
@@ -158,7 +158,7 @@ export function SessionWorkbench({
         {selectedThreadId
           ? (
               <SessionConversationTabs
-                threadId={selectedThreadId}
+                key={selectedThreadId}
                 conversation={(
                   <ReadonlyAssistantThreadComponent
                     thread={readonlyThread}

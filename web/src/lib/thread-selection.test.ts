@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest"
 import type { ClientSource, Session } from "./types"
+import { describe, expect, it } from "vitest"
 import { resolveThreadSelection } from "./thread-selection"
 
 const sources: ClientSource[] = [

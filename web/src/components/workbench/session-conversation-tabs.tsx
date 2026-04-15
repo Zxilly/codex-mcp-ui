@@ -1,25 +1,19 @@
 import type { ReactNode } from "react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface SessionConversationTabsProps {
-  threadId: string
   conversation: ReactNode
   rawEvents: ReactNode
   metadata: ReactNode
 }
 
 export function SessionConversationTabs({
-  threadId,
   conversation,
   rawEvents,
   metadata,
 }: SessionConversationTabsProps) {
   const [tab, setTab] = useState("conversation")
-
-  useEffect(() => {
-    setTab("conversation")
-  }, [threadId])
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">

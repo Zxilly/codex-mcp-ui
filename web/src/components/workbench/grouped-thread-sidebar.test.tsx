@@ -1,6 +1,6 @@
+import type { ClientSource, Session } from "@/lib/types"
 import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
-import type { ClientSource, Session } from "@/lib/types"
 import { GroupedThreadSidebar } from "./grouped-thread-sidebar"
 
 const sources: ClientSource[] = [

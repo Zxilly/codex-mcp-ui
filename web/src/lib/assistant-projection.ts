@@ -115,15 +115,15 @@ export interface ReadonlyAssistantUnknownPart extends ReadonlyAssistantPartBase 
   payload: unknown
 }
 
-export type ReadonlyAssistantPart =
-  | ReadonlyAssistantTextPart
-  | ReadonlyAssistantReasoningPart
-  | ReadonlyAssistantLifecyclePart
-  | ReadonlyAssistantPlanPart
-  | ReadonlyAssistantApprovalPart
-  | ReadonlyAssistantToolPart
-  | ReadonlyAssistantMcpMethodPart
-  | ReadonlyAssistantUnknownPart
+export type ReadonlyAssistantPart
+  = | ReadonlyAssistantTextPart
+    | ReadonlyAssistantReasoningPart
+    | ReadonlyAssistantLifecyclePart
+    | ReadonlyAssistantPlanPart
+    | ReadonlyAssistantApprovalPart
+    | ReadonlyAssistantToolPart
+    | ReadonlyAssistantMcpMethodPart
+    | ReadonlyAssistantUnknownPart
 
 export interface ReadonlyAssistantMessage {
   id: string

@@ -1,7 +1,6 @@
-import { act, render, renderHook, waitFor } from "@testing-library/react"
-import { createElement } from "react"
-import { describe, expect, it, vi } from "vitest"
 import type { EventRecord, PaginatedEventsResponse } from "./types"
+import { act, renderHook, waitFor } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
 import { loadSessionHistory, useSessionHistory } from "./session-history"
 
 function makeEvent(
@@ -310,7 +309,7 @@ describe("useSessionHistory", () => {
       eventIds: string[]
     }> = []
 
-    function Probe({ threadId }: { threadId: string | null }) {
+    const { rerender } = renderHook(({ threadId }: { threadId: string | null }) => {
       const state = useSessionHistory(threadId, {
         eventsPage,
         subscribeEvents: () => () => {},
@@ -322,10 +321,8 @@ describe("useSessionHistory", () => {
         eventIds: state.events.map(evt => evt.event_id),
       })
 
-      return null
-    }
-
-    const { rerender } = render(createElement(Probe, { threadId: "thread-switch-a" }))
+      return state
+    }, { initialProps: { threadId: "thread-switch-a" } })
 
     await waitFor(() => {
       expect(snapshots.some(snapshot =>
@@ -336,7 +333,7 @@ describe("useSessionHistory", () => {
     })
 
     snapshots.length = 0
-    rerender(createElement(Probe, { threadId: "thread-switch-b" }))
+    rerender({ threadId: "thread-switch-b" })
 
     expect(snapshots[0]).toEqual({
       threadId: "thread-switch-b",

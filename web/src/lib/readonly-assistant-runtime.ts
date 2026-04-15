@@ -7,15 +7,15 @@ import type {
   MessageRuntime,
   ThreadListItemRuntime,
   ThreadListRuntime,
-  ThreadRuntime,
   ThreadMessageLike,
+  ThreadRuntime,
 } from "@assistant-ui/react"
-import { useExternalStoreRuntime } from "@assistant-ui/react"
-import { useMemo } from "react"
 import type {
   ReadonlyAssistantMessage,
   ReadonlyAssistantPart,
 } from "./assistant-projection"
+import { useExternalStoreRuntime } from "@assistant-ui/react"
+import { useMemo } from "react"
 
 export const READONLY_ASSISTANT_AFFORDANCES = {
   composer: false,
@@ -25,7 +25,7 @@ export const READONLY_ASSISTANT_AFFORDANCES = {
   attachments: false,
 } as const
 
-type ReadonlyRuntimeCapabilities = {
+interface ReadonlyRuntimeCapabilities {
   edit: false
   reload: false
   switchToBranch: false

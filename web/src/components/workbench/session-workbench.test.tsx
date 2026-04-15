@@ -1,9 +1,9 @@
+import type { ReadonlyAssistantThread as ReadonlyAssistantThreadProjection } from "@/lib/assistant-projection"
 import type { EventRecord, Session, SessionDetail } from "@/lib/types"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import { fixtureClientSource, fixtureSession } from "@/lib/fixtures"
-import type { ReadonlyAssistantThread as ReadonlyAssistantThreadProjection } from "@/lib/assistant-projection"
 import { SessionWorkbench } from "./session-workbench"
 
 function makeSession(overrides: Partial<Session>): Session {
@@ -63,8 +63,10 @@ function ReadonlyAssistantThreadStub({
     <div>
       {thread?.messages.map(message => (
         <div key={message.id}>
-          {message.parts.map((part, index) => (
-            <span key={`${message.id}-${index}`}>
+          {message.parts.map(part => (
+            <span
+              key={`${message.id}-${"text" in part ? `${part.type}-${part.text}` : `${part.type}-${part.title}`}`}
+            >
               {"text" in part ? part.text : part.type}
             </span>
           ))}
