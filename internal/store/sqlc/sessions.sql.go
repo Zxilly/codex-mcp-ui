@@ -17,9 +17,20 @@ FROM sessions
 WHERE session_id = ?
 `
 
-func (q *Queries) GetSession(ctx context.Context, sessionID string) (Session, error) {
+type GetSessionRow struct {
+	SessionID       string
+	ClientSourceKey string
+	Model           sql.NullString
+	Cwd             sql.NullString
+	ApprovalPolicy  sql.NullString
+	Title           sql.NullString
+	FirstSeenAt     int64
+	LastSeenAt      int64
+}
+
+func (q *Queries) GetSession(ctx context.Context, sessionID string) (GetSessionRow, error) {
 	row := q.queryRow(ctx, q.getSessionStmt, getSession, sessionID)
-	var i Session
+	var i GetSessionRow
 	err := row.Scan(
 		&i.SessionID,
 		&i.ClientSourceKey,
@@ -41,15 +52,26 @@ WHERE client_source_key = ?
 ORDER BY last_seen_at DESC
 `
 
-func (q *Queries) ListSessionsBySource(ctx context.Context, clientSourceKey string) ([]Session, error) {
+type ListSessionsBySourceRow struct {
+	SessionID       string
+	ClientSourceKey string
+	Model           sql.NullString
+	Cwd             sql.NullString
+	ApprovalPolicy  sql.NullString
+	Title           sql.NullString
+	FirstSeenAt     int64
+	LastSeenAt      int64
+}
+
+func (q *Queries) ListSessionsBySource(ctx context.Context, clientSourceKey string) ([]ListSessionsBySourceRow, error) {
 	rows, err := q.query(ctx, q.listSessionsBySourceStmt, listSessionsBySource, clientSourceKey)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Session
+	var items []ListSessionsBySourceRow
 	for rows.Next() {
-		var i Session
+		var i ListSessionsBySourceRow
 		if err := rows.Scan(
 			&i.SessionID,
 			&i.ClientSourceKey,

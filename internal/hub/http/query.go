@@ -130,7 +130,6 @@ func proxiesHandler(app *hub.App) nethttp.HandlerFunc {
 
 func sessionEventsHandler(app *hub.App) nethttp.HandlerFunc {
 	return func(w nethttp.ResponseWriter, r *nethttp.Request) {
-		items := []api.EventRecordDTO{}
 		if app.Store != nil {
 			threadID := r.PathValue("threadId")
 			limit := 100
@@ -139,20 +138,34 @@ func sessionEventsHandler(app *hub.App) nethttp.HandlerFunc {
 					limit = n
 				}
 			}
-			since := r.URL.Query().Get("after")
-			if since == "" {
-				since = r.URL.Query().Get("before")
+			cursor := r.URL.Query().Get("cursor")
+			if cursor == "" {
+				cursor = r.URL.Query().Get("after")
 			}
-			events, err := app.Store.ListSessionEvents(r.Context(), threadID, limit, since)
+			if cursor == "" {
+				cursor = r.URL.Query().Get("before")
+			}
+			if _, _, err := sqlite.ParseSessionEventCursor(cursor); err != nil {
+				nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+				return
+			}
+			page, err := app.Store.ListSessionEventsPage(r.Context(), threadID, limit, cursor)
 			if err != nil {
 				nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
 				return
 			}
-			for _, e := range events {
+			items := make([]api.EventRecordDTO, 0, len(page.Items))
+			for _, e := range page.Items {
 				items = append(items, toEventDTO(e))
 			}
+			writeJSON(w, nethttp.StatusOK, api.CursorItemsResponse[api.EventRecordDTO]{
+				Cursor:     cursor,
+				Items:      items,
+				NextCursor: page.NextCursor,
+			})
+			return
 		}
-		writeJSON(w, nethttp.StatusOK, api.ItemsResponse[api.EventRecordDTO]{Items: items})
+		writeJSON(w, nethttp.StatusOK, api.CursorItemsResponse[api.EventRecordDTO]{Items: []api.EventRecordDTO{}})
 	}
 }
 

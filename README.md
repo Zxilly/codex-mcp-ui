@@ -68,12 +68,11 @@ go tool cover -html=coverage.out
 
 - **Proxy** (`internal/proxy`): launches downstream `codex mcp-server`, bridges stdio frames, observes `initialize`, `tools/call`, `notifications/cancelled`, `codex/event`, `elicitation/create`, and responses for active calls. Ships normalized envelopes to the hub on a bounded worker queue; traffic forwarding continues and degraded state is surfaced once if the hub becomes unreachable.
 - **Hub** (`internal/hub`): loopback-only HTTP service with handshake, ingest, query, SSE fanout, and embedded UI. Persists events to SQLite via `sqlc`-generated prepared statements with Goose migrations.
-- **Frontend** (`web/`): React + shadcn/ui dashboard with an error boundary, loading/empty states, a live-connection badge, URL-hash session persistence, and tabs for Milestones / Raw events / Metadata. Uses TanStack Query for REST and `@microsoft/fetch-event-source` for SSE patch-in.
+- **Frontend** (`web/`): React + shadcn/ui read-only workbench with an error boundary, loading/empty states, a live-connection badge, URL-hash session persistence, and tabs for Conversation / Raw events / Metadata. Uses TanStack Query for REST and `@microsoft/fetch-event-source` for SSE patch-in.
 
 ## Known v1 limits
 
 - Single local hub per port; no cross-host operation.
-- Milestone annotations cover curated Codex events plus standard MCP methods (`initialize`, `tools/*`, `resources/*`, `prompts/*`, `sampling/*`, `notifications/*`); unrecognized methods render as generic milestones with raw payload.
 - Dashboard is read-only — no replay, edit, or cancel actions.
 - Goose migrations are embedded; no downgrade path exposed.
 - SSE resume via `Last-Event-ID` / `?since=` works within the broker's in-memory ring buffer (512 events); history beyond that must be paged via `GET /api/v1/sessions/{threadId}/events`.

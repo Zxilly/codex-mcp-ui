@@ -56,14 +56,14 @@ CREATE TABLE events (
   raw_json BLOB NOT NULL
 );
 
-CREATE INDEX idx_events_session_time ON events(session_id, occurred_at);
+CREATE INDEX idx_events_session_time_event_id ON events(session_id, occurred_at, event_id);
 CREATE INDEX idx_mcp_calls_source ON mcp_calls(client_source_key);
 CREATE INDEX idx_sessions_source ON sessions(client_source_key);
 
 -- +goose Down
 DROP INDEX IF EXISTS idx_sessions_source;
 DROP INDEX IF EXISTS idx_mcp_calls_source;
-DROP INDEX IF EXISTS idx_events_session_time;
+DROP INDEX IF EXISTS idx_events_session_time_event_id;
 DROP TABLE IF EXISTS events;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS mcp_calls;

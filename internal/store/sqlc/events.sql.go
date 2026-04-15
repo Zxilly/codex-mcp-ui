@@ -48,34 +48,22 @@ func (q *Queries) AppendEvent(ctx context.Context, arg AppendEventParams) error 
 
 const listRecentEvents = `-- name: ListRecentEvents :many
 SELECT event_id, proxy_instance_id, client_source_key, session_id, turn_id,
-       request_id, direction, event_type, occurred_at, raw_json
+       request_id, direction, event_type, occurred_at, raw_json,
+       category, command_call_id, tool_call_id
 FROM events
 ORDER BY occurred_at DESC
 LIMIT ?
 `
 
-type ListRecentEventsRow struct {
-	EventID         string
-	ProxyInstanceID string
-	ClientSourceKey sql.NullString
-	SessionID       sql.NullString
-	TurnID          sql.NullString
-	RequestID       sql.NullString
-	Direction       string
-	EventType       string
-	OccurredAt      int64
-	RawJson         []byte
-}
-
-func (q *Queries) ListRecentEvents(ctx context.Context, limit int64) ([]ListRecentEventsRow, error) {
+func (q *Queries) ListRecentEvents(ctx context.Context, limit int64) ([]Event, error) {
 	rows, err := q.query(ctx, q.listRecentEventsStmt, listRecentEvents, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListRecentEventsRow
+	var items []Event
 	for rows.Next() {
-		var i ListRecentEventsRow
+		var i Event
 		if err := rows.Scan(
 			&i.EventID,
 			&i.ProxyInstanceID,
@@ -87,6 +75,9 @@ func (q *Queries) ListRecentEvents(ctx context.Context, limit int64) ([]ListRece
 			&i.EventType,
 			&i.OccurredAt,
 			&i.RawJson,
+			&i.Category,
+			&i.CommandCallID,
+			&i.ToolCallID,
 		); err != nil {
 			return nil, err
 		}
@@ -103,37 +94,34 @@ func (q *Queries) ListRecentEvents(ctx context.Context, limit int64) ([]ListRece
 
 const listSessionEventsSince = `-- name: ListSessionEventsSince :many
 SELECT event_id, proxy_instance_id, client_source_key, session_id, turn_id,
-       request_id, direction, event_type, occurred_at, raw_json
+       request_id, direction, event_type, occurred_at, raw_json,
+       category, command_call_id, tool_call_id
 FROM events
-WHERE session_id = ? AND (? = '' OR event_id > ?)
+WHERE session_id = ?
+  AND (
+    ? = 0
+    OR occurred_at > ?
+    OR (occurred_at = ? AND event_id > ?)
+  )
 ORDER BY occurred_at ASC, event_id ASC
 LIMIT ?
 `
 
 type ListSessionEventsSinceParams struct {
-	SessionID sql.NullString
-	Column2   interface{}
-	EventID   string
-	Limit     int64
+	SessionID    sql.NullString
+	Column2      interface{}
+	OccurredAt   int64
+	OccurredAt_2 int64
+	EventID      string
+	Limit        int64
 }
 
-type ListSessionEventsSinceRow struct {
-	EventID         string
-	ProxyInstanceID string
-	ClientSourceKey sql.NullString
-	SessionID       sql.NullString
-	TurnID          sql.NullString
-	RequestID       sql.NullString
-	Direction       string
-	EventType       string
-	OccurredAt      int64
-	RawJson         []byte
-}
-
-func (q *Queries) ListSessionEventsSince(ctx context.Context, arg ListSessionEventsSinceParams) ([]ListSessionEventsSinceRow, error) {
+func (q *Queries) ListSessionEventsSince(ctx context.Context, arg ListSessionEventsSinceParams) ([]Event, error) {
 	rows, err := q.query(ctx, q.listSessionEventsSinceStmt, listSessionEventsSince,
 		arg.SessionID,
 		arg.Column2,
+		arg.OccurredAt,
+		arg.OccurredAt_2,
 		arg.EventID,
 		arg.Limit,
 	)
@@ -141,9 +129,9 @@ func (q *Queries) ListSessionEventsSince(ctx context.Context, arg ListSessionEve
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListSessionEventsSinceRow
+	var items []Event
 	for rows.Next() {
-		var i ListSessionEventsSinceRow
+		var i Event
 		if err := rows.Scan(
 			&i.EventID,
 			&i.ProxyInstanceID,
@@ -155,6 +143,9 @@ func (q *Queries) ListSessionEventsSince(ctx context.Context, arg ListSessionEve
 			&i.EventType,
 			&i.OccurredAt,
 			&i.RawJson,
+			&i.Category,
+			&i.CommandCallID,
+			&i.ToolCallID,
 		); err != nil {
 			return nil, err
 		}

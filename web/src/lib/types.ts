@@ -41,7 +41,7 @@ export interface EventRecord {
   payload: unknown
 }
 
-export interface EventPage {
+export interface PaginatedEventsResponse {
   items: EventRecord[]
   next_cursor?: string
 }

@@ -44,6 +44,9 @@ describe("api client", () => {
     const sources = await api.clientSources()
     expect(sources).toHaveLength(1)
     expect(sources[0].source_key).toBe("s1")
+    expect(calls[0]?.[1]).toMatchObject({
+      headers: { accept: "application/json" },
+    })
   })
 
   it("uRL-encodes path segments", async () => {
@@ -63,6 +66,21 @@ describe("api client", () => {
     expect(url).toMatch(/\/api\/v1\/sessions\/t1\/events\?/)
     expect(url).toContain("limit=10")
     expect(url).toContain("cursor=1000%7Cevt-a")
+  })
+
+  it("omits empty query params for eventsPage", async () => {
+    await api.eventsPage("t1")
+    expect(calls.at(-1)?.[0]).toBe("/api/v1/sessions/t1/events")
+
+    await api.eventsPage("t1", { cursor: "cursor-only" })
+    expect(calls.at(-1)?.[0]).toBe("/api/v1/sessions/t1/events?cursor=cursor-only")
+
+    await api.eventsPage("t1", { limit: 25 })
+    expect(calls.at(-1)?.[0]).toBe("/api/v1/sessions/t1/events?limit=25")
+  })
+
+  it("does not expose the legacy events wrapper with the invalid before cursor contract", () => {
+    expect(api).not.toHaveProperty("events")
   })
 
   it("throws when the response is not ok", async () => {

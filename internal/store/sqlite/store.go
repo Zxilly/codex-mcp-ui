@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/codex/codex-mcp-ui/internal/store/sqlc"
@@ -58,6 +60,36 @@ func nullInt64(v int64) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: v, Valid: true}
+}
+
+func formatSessionEventCursor(occurredAt int64, eventID string) string {
+	if eventID == "" {
+		return ""
+	}
+	return strconv.FormatInt(occurredAt, 10) + "|" + eventID
+}
+
+func FormatSessionEventCursor(occurredAt int64, eventID string) string {
+	return formatSessionEventCursor(occurredAt, eventID)
+}
+
+func parseSessionEventCursor(cursor string) (int64, string, error) {
+	if cursor == "" {
+		return 0, "", nil
+	}
+	occurredAtRaw, eventID, ok := strings.Cut(cursor, "|")
+	if !ok || occurredAtRaw == "" || eventID == "" {
+		return 0, "", fmt.Errorf("invalid session event cursor %q", cursor)
+	}
+	occurredAt, err := strconv.ParseInt(occurredAtRaw, 10, 64)
+	if err != nil {
+		return 0, "", fmt.Errorf("invalid session event cursor %q: %w", cursor, err)
+	}
+	return occurredAt, eventID, nil
+}
+
+func ParseSessionEventCursor(cursor string) (int64, string, error) {
+	return parseSessionEventCursor(cursor)
 }
 
 // --- Proxy instances ---
@@ -448,6 +480,11 @@ type EventRecord struct {
 	RawJSON         []byte
 }
 
+type SessionEventPage struct {
+	Items      []EventRecord
+	NextCursor string
+}
+
 // AppendEvent persists r and returns the EventID actually written (useful
 // when the caller left it blank and the store generated one).
 func (s *Store) AppendEvent(ctx context.Context, r EventRecord) error {
@@ -476,45 +513,65 @@ func (s *Store) AppendEventReturningID(ctx context.Context, r EventRecord) (stri
 	return r.EventID, err
 }
 
-func (s *Store) ListSessionEvents(ctx context.Context, sessionID string, limit int, afterEventID string) ([]EventRecord, error) {
-	if limit <= 0 {
-		limit = 100
-	}
-	rows, err := s.db.QueryContext(ctx, `SELECT
-		event_id, proxy_instance_id, client_source_key, session_id, turn_id,
-		request_id, direction, event_type, occurred_at, raw_json,
-		category, command_call_id, tool_call_id
-	FROM events
-	WHERE session_id = ? AND (? = '' OR event_id > ?)
-	ORDER BY occurred_at ASC, event_id ASC
-	LIMIT ?`, sessionID, afterEventID, afterEventID, limit)
+func (s *Store) ListSessionEvents(ctx context.Context, sessionID string, limit int, cursor string) ([]EventRecord, error) {
+	page, err := s.ListSessionEventsPage(ctx, sessionID, limit, cursor)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := make([]EventRecord, 0)
-	for rows.Next() {
-		var (
-			r              EventRecord
-			clientSourceNS sql.NullString
-			sessionNS      sql.NullString
-			turnNS         sql.NullString
-			requestNS      sql.NullString
-			commandCallNS  sql.NullString
-			toolCallNS     sql.NullString
-		)
-		if err := rows.Scan(&r.EventID, &r.ProxyInstanceID, &clientSourceNS, &sessionNS,
-			&turnNS, &requestNS, &r.Direction, &r.EventType, &r.OccurredAt, &r.RawJSON,
-			&r.Category, &commandCallNS, &toolCallNS); err != nil {
-			return nil, err
-		}
-		r.ClientSourceKey = clientSourceNS.String
-		r.SessionID = sessionNS.String
-		r.TurnID = turnNS.String
-		r.RequestID = requestNS.String
-		r.CommandCallID = commandCallNS.String
-		r.ToolCallID = toolCallNS.String
-		out = append(out, r)
+	return page.Items, nil
+}
+
+func (s *Store) ListSessionEventsPage(ctx context.Context, sessionID string, limit int, cursor string) (SessionEventPage, error) {
+	if limit <= 0 {
+		limit = 100
 	}
-	return out, rows.Err()
+	occurredAt, eventID, err := parseSessionEventCursor(cursor)
+	if err != nil {
+		return SessionEventPage{}, err
+	}
+	hasCursor := int64(0)
+	if cursor != "" {
+		hasCursor = 1
+	}
+	rows, err := s.q.ListSessionEventsSince(ctx, sqlc.ListSessionEventsSinceParams{
+		SessionID:    nullString(sessionID),
+		Column2:      hasCursor,
+		OccurredAt:   occurredAt,
+		OccurredAt_2: occurredAt,
+		EventID:      eventID,
+		Limit:        int64(limit + 1),
+	})
+	if err != nil {
+		return SessionEventPage{}, err
+	}
+	page := SessionEventPage{
+		Items: make([]EventRecord, 0, limit),
+	}
+	for idx, row := range rows {
+		if idx == limit {
+			lastItem := page.Items[len(page.Items)-1]
+			page.NextCursor = formatSessionEventCursor(lastItem.OccurredAt, lastItem.EventID)
+			break
+		}
+		page.Items = append(page.Items, eventRecordFromEventRow(row))
+	}
+	return page, nil
+}
+
+func eventRecordFromEventRow(row sqlc.Event) EventRecord {
+	return EventRecord{
+		EventID:         row.EventID,
+		ProxyInstanceID: row.ProxyInstanceID,
+		ClientSourceKey: row.ClientSourceKey.String,
+		SessionID:       row.SessionID.String,
+		TurnID:          row.TurnID.String,
+		RequestID:       row.RequestID.String,
+		Direction:       row.Direction,
+		EventType:       row.EventType,
+		Category:        row.Category,
+		CommandCallID:   row.CommandCallID.String,
+		ToolCallID:      row.ToolCallID.String,
+		OccurredAt:      row.OccurredAt,
+		RawJSON:         row.RawJson,
+	}
 }

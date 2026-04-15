@@ -2,6 +2,10 @@
 .worktrees/
 .codex-cache/
 .cov/
+.agents/
+.claude/
+docs/
+skills-lock.json
 
 bin/
 dist/
@@ -10,6 +14,7 @@ web/node_modules/
 web/test-results/
 web/tests/__screenshots__/
 web/.vitest-attachments/
+web/coverage/
 test-results/
 
 internal/hub/web/dist/

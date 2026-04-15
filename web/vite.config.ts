@@ -13,5 +13,6 @@ export default defineConfig({
   build: {
     outDir: "../internal/hub/web/dist",
     emptyOutDir: true,
+    chunkSizeWarningLimit: 10000,
   },
 })

@@ -23,11 +23,11 @@ func TestUIEndpointsReturnSnakeCaseShape(t *testing.T) {
 	app := newTestApp(t)
 	ctx := context.Background()
 	require.NoError(t, app.Store.UpsertClientSource(ctx, sqlite.ClientSourceRecord{
-		ClientSourceKey: "claude|pid-18244",
-		PID:             18244,
-		ProtocolVersion: "2024-11-05",
-		ClientName:      "Claude Desktop",
-		ClientVersion:   "1.2.3",
+		ClientSourceKey:  "claude|pid-18244",
+		PID:              18244,
+		ProtocolVersion:  "2024-11-05",
+		ClientName:       "Claude Desktop",
+		ClientVersion:    "1.2.3",
 		CapabilitiesJSON: "{}",
 	}))
 	require.NoError(t, app.Store.UpsertSession(ctx, sqlite.SessionRecord{
@@ -36,10 +36,20 @@ func TestUIEndpointsReturnSnakeCaseShape(t *testing.T) {
 		Model:           "gpt-5.4",
 	}))
 	require.NoError(t, app.Store.AppendEvent(ctx, sqlite.EventRecord{
-		SessionID: "thread-abc",
-		EventType: "session_configured",
-		Direction: "codex_to_upstream",
-		RawJSON:   []byte(`{"hello":"world"}`),
+		EventID:    "evt-z",
+		SessionID:  "thread-abc",
+		EventType:  "session_configured",
+		Direction:  "codex_to_upstream",
+		OccurredAt: 1000,
+		RawJSON:    []byte(`{"hello":"world"}`),
+	}))
+	require.NoError(t, app.Store.AppendEvent(ctx, sqlite.EventRecord{
+		EventID:    "evt-a",
+		SessionID:  "thread-abc",
+		EventType:  "turn_complete",
+		Direction:  "codex_to_upstream",
+		OccurredAt: 2000,
+		RawJSON:    []byte(`{"goodbye":"world"}`),
 	}))
 	require.NoError(t, app.Store.RegisterProxy(ctx, sqlite.RegisterProxyParams{
 		ProxyInstanceID: "proxy-1",
@@ -78,7 +88,8 @@ func TestUIEndpointsReturnSnakeCaseShape(t *testing.T) {
 	})
 
 	t.Run("session events has snake_case items", func(t *testing.T) {
-		raw := fetchRaw(t, srv, "/api/v1/sessions/thread-abc/events")
+		raw := fetchRaw(t, srv, "/api/v1/sessions/thread-abc/events?limit=1")
+		require.Contains(t, raw, "next_cursor")
 		items := raw["items"].([]any)
 		require.NotEmpty(t, items)
 		evt := items[0].(map[string]any)
@@ -115,6 +126,52 @@ func TestUIEndpointsReturnSnakeCaseShape(t *testing.T) {
 		require.NotContains(t, env, "eventId")
 		require.NotContains(t, env, "occurredAtUnixMs")
 	})
+}
+
+func TestSessionEventsUsesStableCursorPagination(t *testing.T) {
+	app := newTestApp(t)
+	ctx := context.Background()
+	require.NoError(t, app.Store.RegisterProxy(ctx, sqlite.RegisterProxyParams{
+		ProxyInstanceID: "proxy-1",
+		ClientSourceKey: "claude|pid-18244",
+		PID:             18244,
+	}))
+	for _, event := range []sqlite.EventRecord{
+		{EventID: "evt-b", ProxyInstanceID: "proxy-1", ClientSourceKey: "claude|pid-18244", SessionID: "thread-abc", EventType: "turn_started", Direction: "codex_to_upstream", OccurredAt: 1000, RawJSON: []byte(`{"n":1}`)},
+		{EventID: "evt-z", ProxyInstanceID: "proxy-1", ClientSourceKey: "claude|pid-18244", SessionID: "thread-abc", EventType: "turn_delta", Direction: "codex_to_upstream", OccurredAt: 1000, RawJSON: []byte(`{"n":2}`)},
+		{EventID: "evt-a", ProxyInstanceID: "proxy-1", ClientSourceKey: "claude|pid-18244", SessionID: "thread-abc", EventType: "turn_complete", Direction: "codex_to_upstream", OccurredAt: 2000, RawJSON: []byte(`{"n":3}`)},
+	} {
+		require.NoError(t, app.Store.AppendEvent(ctx, event))
+	}
+
+	srv := httptest.NewServer(NewRouter(app))
+	defer srv.Close()
+
+	firstPage := fetchRaw(t, srv, "/api/v1/sessions/thread-abc/events?limit=2")
+	require.Equal(t, "1000|evt-z", firstPage["next_cursor"])
+	require.NotContains(t, firstPage, "cursor")
+	firstItems := firstPage["items"].([]any)
+	require.Len(t, firstItems, 2)
+	require.Equal(t, "evt-b", firstItems[0].(map[string]any)["event_id"])
+	require.Equal(t, "evt-z", firstItems[1].(map[string]any)["event_id"])
+
+	secondPage := fetchRaw(t, srv, "/api/v1/sessions/thread-abc/events?limit=2&cursor=1000%7Cevt-z")
+	require.Equal(t, "1000|evt-z", secondPage["cursor"])
+	secondItems := secondPage["items"].([]any)
+	require.Len(t, secondItems, 1)
+	require.Equal(t, "evt-a", secondItems[0].(map[string]any)["event_id"])
+	require.NotContains(t, secondPage, "next_cursor")
+}
+
+func TestSessionEventsRejectsMalformedCursor(t *testing.T) {
+	app := newTestApp(t)
+	srv := httptest.NewServer(NewRouter(app))
+	defer srv.Close()
+
+	resp, err := srv.Client().Get(srv.URL + "/api/v1/sessions/thread-abc/events?cursor=bad-cursor")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func fetchRaw(t *testing.T, srv *httptest.Server, path string) map[string]any {

@@ -11,9 +11,12 @@
     "preview": "vite preview",
     "test": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "test:coverage": "vitest run --project unit --coverage"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.12.24",
+    "@assistant-ui/react-markdown": "^0.12.8",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-scroll-area": "^1.2.10",
@@ -47,6 +50,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/coverage-v8": "^4.1.4",
     "@vitest/browser-playwright": "^4.1.4",
     "eslint": "^10.2.0",
     "eslint-plugin-react-hooks": "^7.0.1",

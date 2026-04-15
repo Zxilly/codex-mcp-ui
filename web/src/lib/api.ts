@@ -1,6 +1,6 @@
 import type {
   ClientSource,
-  EventPage,
+  PaginatedEventsResponse,
   Session,
   SessionDetail,
 } from "./types"
@@ -33,13 +33,8 @@ export const api = {
     if (opts?.cursor)
       qs.set("cursor", opts.cursor)
     const suffix = qs.size > 0 ? `?${qs.toString()}` : ""
-    return getJSON<EventPage>(
+    return getJSON<PaginatedEventsResponse>(
       `/sessions/${encodeURIComponent(threadId)}/events${suffix}`,
     )
   },
-  events: (threadId: string, opts?: { limit?: number, before?: string }) =>
-    api.eventsPage(threadId, {
-      limit: opts?.limit,
-      cursor: opts?.before,
-    }).then(r => r.items),
 }

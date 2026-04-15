@@ -9,6 +9,19 @@ export default defineConfig({
   plugins: [react()],
   resolve: { alias },
   test: {
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "json-summary"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/test/**",
+        "src/components/ui/**",
+        "src/components/workbench/readonly-assistant-thread.tsx",
+        "src/main.tsx",
+      ],
+    },
     projects: [
       {
         plugins: [react()],
